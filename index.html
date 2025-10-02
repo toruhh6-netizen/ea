@@ -7,218 +7,124 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
   <style>
-    :root{--bg:#0b1020;--panel:#0f172a;--text:#e5e7eb;--muted:#94a3b8;--brand:#10b981;--border:#1f2a44}
-    *{box-sizing:border-box}
-    body{margin:0;background:#0b1020;color:var(--text);font:14px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial}
-    .container{max-width:1200px;margin:0 auto;padding:24px 16px}
-    .header{display:flex;gap:12px;align-items:center}
-    .title{font-size:20px;font-weight:800}
-    .grid{display:grid;gap:16px;grid-template-columns:380px 1fr}
-    .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
-    .card .inner{padding:14px}
-    label{display:block;color:var(--muted);font-size:12px;margin-top:8px}
-    textarea,input,select{width:100%;margin-top:6px;border-radius:10px;border:1px solid var(--border);background:#0e152a;color:var(--text);padding:10px 12px}
-    textarea{height:140px;resize:vertical}
-    .row{display:flex;gap:8px;align-items:center}
-    .btn{display:inline-flex;align-items:center;gap:8px;border-radius:10px;border:1px solid var(--border);padding:10px 12px;background:#111827;color:#fff;cursor:pointer}
-    .btn.primary{background:var(--brand);border-color:var(--brand);color:#001b10;font-weight:700}
-    .toolbar{display:flex;gap:8px;flex-wrap:wrap}
-    table{width:100%;border-collapse:collapse;table-layout:fixed}
-    th,td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
-    th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
-    td.address{word-break:break-all;max-width:100%}
-    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-    td.address{word-break:break-word;white-space:normal;max-width:100%}
-    th:nth-child(2), td:nth-child(2){width:100%}
-    .pill{padding:.2rem .55rem;border:1px solid var(--border);border-radius:999px;font-size:12px;color:var(--muted)}
-    .ok{color:#34d399}
-    .err{color:#fb7185}
+    body{margin:0;background:#0b1020;color:#e5e7eb;font:14px/1.45 sans-serif}
+    .container{max-width:1200px;margin:0 auto;padding:20px}
+    .header{display:flex;justify-content:space-between;align-items:center}
+    .grid{display:grid;gap:16px;grid-template-columns:380px 1fr;margin-top:16px}
+    .card{background:#111827;border-radius:10px;padding:14px}
+    textarea,input{width:100%;padding:8px;margin-top:6px;border-radius:6px;border:1px solid #1f2a44;background:#0e152a;color:#e5e7eb}
+    textarea{height:140px}
+    button{margin-top:8px;padding:8px 12px;border:0;border-radius:6px;cursor:pointer}
+    button.primary{background:#10b981;color:#001b10;font-weight:700}
+    table{width:100%;border-collapse:collapse;table-layout:auto}
+    th,td{padding:8px;border-bottom:1px solid #1f2a44;text-align:left}
+    td.address{word-break:break-all;white-space:normal}
+    .pill{padding:4px 8px;border:1px solid #1f2a44;border-radius:999px;font-size:12px;margin-right:6px}
+    .ok{color:#34d399}.err{color:#fb7185}
+    .stats{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+    .total-balance{font-size:18px;font-weight:bold;text-align:right;margin-top:12px}
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <div class="title">⚡ EVM Multi Wallet Checker</div>
+<div class="container">
+  <div class="header"><h2>⚡ EVM Multi Wallet Checker</h2><span style="font-size:12px;color:#94a3b8">ethers.js + SheetJS</span></div>
+
+  <div class="grid">
+    <div class="card">
+      <label>Wallet addresses (1 per line)</label>
+      <textarea id="addrInput" placeholder="0xabc...\n0xdef..."></textarea>
+      <input type="file" id="fileInput" accept=".csv, .xlsx, .xls" />
+      <button id="btnImport">Import CSV/XLSX</button>
+      <label>Custom RPC URL</label>
+      <input id="rpcUrl" placeholder="https://rpc.ankr.com/eth"/>
+      <label>Concurrency</label>
+      <input id="concurrency" type="number" value="6"/>
+      <label>Timeout (ms)</label>
+      <input id="timeout" type="number" value="15000"/>
+      <label>Custom Symbol</label>
+      <input id="customSymbol" placeholder="ETH"/>
+      <button class="primary" id="btnCheck">Check Wallets</button>
+      <button id="btnStop">Stop</button>
+      <button id="btnExportCsv">Export CSV</button>
+      <button id="btnExportXlsx">Export XLSX</button>
     </div>
 
-    <div class="grid" style="margin-top:16px">
-      <div class="card">
-        <div class="inner">
-          <label>Wallet addresses (1 per line)</label>
-          <textarea id="addrInput" placeholder="0xabc...\n0xdef...\n0x..."></textarea>
-          <div class="row" style="margin-top:8px">
-            <input type="file" id="fileInput" accept=".csv, .xlsx, .xls" />
-            <button class="btn" id="btnImport">Import CSV/XLSX</button>
-            <span class="pill" id="addrCount">0 addr</span>
-          </div>
-          <label style="margin-top:12px">Custom RPC URL</label>
-          <input id="rpcUrl" placeholder="https://rpc.ankr.com/eth"/>
-          <label>Concurrency</label>
-          <input id="concurrency" type="number" min="1" max="20" value="6"/>
-          <label>Timeout (ms)</label>
-          <input id="timeout" type="number" min="1000" step="500" value="15000"/>
-          <label>Custom Symbol</label>
-          <input id="customSymbol" placeholder="ETH / BNB / MATIC"/>
-          <div class="row" style="margin-top:10px">
-            <button class="btn primary" id="btnCheck">Check Wallets</button>
-            <button class="btn" id="btnStop">Stop</button>
-          </div>
-          <div class="row" style="margin-top:10px">
-            <button class="btn" id="btnExportCsv">Export CSV</button>
-            <button class="btn" id="btnExportXlsx">Export XLSX</button>
-          </div>
-        </div>
+    <div class="card">
+      <div class="stats">
+        <span class="pill">Total: <span id="statTotal">0</span></span>
+        <span class="pill ok">OK: <span id="statOk">0</span></span>
+        <span class="pill err">ERR: <span id="statErr">0</span></span>
+        <span class="pill">Duration: <span id="statDur">0s</span></span>
       </div>
-
-      <div class="card">
-        <div class="inner">
-          <div class="row toolbar" style="align-items:center">
-            <span class="pill">Total: <span id="statTotal">0</span></span>
-            <span class="pill ok">OK: <span id="statOk">0</span></span>
-            <span class="pill err">ERR: <span id="statErr">0</span></span>
-            <span class="pill">Total Balance: <span id="statSum">0</span></span>
-            <span class="pill">Unit: <span id="unitName">ether</span></span>
-            <span class="pill right">Duration: <span id="statDur">0s</span></span>
-          </div>
-          <div class="results-wrap" style="overflow-y:auto; overflow-x:hidden; max-height:70vh; margin-top:8px">
-            <table id="resultTable">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Address</th>
-                  <th>Balance</th>
-                  <th>Nonce</th>
-                  <th>Status</th>
-                  <th>Message</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </div>
+      <div style="overflow-y:auto;max-height:60vh">
+        <table id="resultTable">
+          <thead><tr><th>#</th><th>Address</th><th>Balance</th><th>Nonce</th><th>Status</th><th>Message</th></tr></thead>
+          <tbody></tbody>
+        </table>
       </div>
+      <div class="total-balance">Total Balance: <span id="statSum">0</span> <span id="unitName">ETH</span></div>
     </div>
   </div>
+</div>
 
 <script>
 (() => {
   const { ethers } = window;
-  const el = (id) => document.getElementById(id);
-  const addrInput = el('addrInput');
-  const fileInput = el('fileInput');
-  const btnImport = el('btnImport');
-  const btnCheck = el('btnCheck');
-  const btnStop = el('btnStop');
-  const btnExportCsv = el('btnExportCsv');
-  const btnExportXlsx = el('btnExportXlsx');
-  const rpcUrl = el('rpcUrl');
-  const concurrencyEl = el('concurrency');
-  const timeoutEl = el('timeout');
-  const customSymbol = el('customSymbol');
-  const unitName = el('unitName');
-  const statTotal = el('statTotal');
-  const statOk = el('statOk');
-  const statErr = el('statErr');
-  const statDur = el('statDur');
-  const statSum = el('statSum');
+  const el = id => document.getElementById(id);
   const tbody = document.querySelector('#resultTable tbody');
+  const statTotal=el('statTotal'), statOk=el('statOk'), statErr=el('statErr'), statDur=el('statDur'), statSum=el('statSum'), unitName=el('unitName');
+  let controller={stop:false}, results=[], sum=0;
 
-  let controller = { stop: false };
-  let results = [];
-  let sum = 0;
-  let symbol = 'ether';
+  const normalizeAddrs = text => (text||'').split(/\r?\n|,|\s+/).map(s=>s.trim()).filter(Boolean);
 
-  const normalizeAddrs = (text) => (text||'').split(/\r?\n|,|\s+/).map(s=>s.trim()).filter(Boolean);
-
-  const setCount = () => {
-    const count = normalizeAddrs(addrInput.value).length;
-    el('addrCount').textContent = count + ' addr';
-    statTotal.textContent = count;
-  };
-  addrInput.addEventListener('input', setCount);
-  setCount();
-
-  async function readFile(file){
-    const data = await file.arrayBuffer();
-    const wb = XLSX.read(data, { type:'array' });
-    const sheet = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(sheet, { header:1, raw:true });
-    return rows.flat().map(v => String(v).trim()).filter(Boolean);
-  }
-
-  btnImport.addEventListener('click', async()=>{
-    const f = fileInput.files && fileInput.files[0];
-    if(!f) return alert('Pilih file CSV/XLSX dulu');
-    const addrs = await readFile(f);
-    const merged = [...normalizeAddrs(addrInput.value), ...addrs];
-    const uniq = Array.from(new Map(merged.map(a=>[a.toLowerCase(),a])).values());
-    addrInput.value = uniq.join('\n');
-    setCount();
-  });
-
-  function addRow(i,address){
+  function addRow(i,addr){
     const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${i+1}</td><td class="mono address">${address}</td><td data-k="bal">-</td><td data-k="nonce">-</td><td data-k="status">…</td><td data-k="msg"></td>`;
-    tbody.appendChild(tr); return tr;
+    tr.innerHTML=`<td>${i+1}</td><td class="address">${addr}</td><td data-k="bal">-</td><td data-k="nonce">-</td><td data-k="status">…</td><td data-k="msg"></td>`;
+    tbody.appendChild(tr);return tr;
   }
 
-  async function checkOne(provider,address,i,row){
-    const out={index:i+1,address,balance:null,nonce:null,status:'OK',message:''};
+  async function checkOne(provider,addr,i,row,symbol){
+    const out={index:i+1,address:addr,balance:null,nonce:null,status:"OK",message:""};
     try{
-      if(!ethers.utils.isAddress(address)) throw new Error('Invalid address');
-      const balWei=await provider.getBalance(address);
-      const nonce=await provider.getTransactionCount(address);
+      if(!ethers.utils.isAddress(addr)) throw new Error("Invalid address");
+      const balWei=await provider.getBalance(addr);
+      const nonce=await provider.getTransactionCount(addr);
       const ether=ethers.utils.formatEther(balWei);
-      row.querySelector('[data-k="bal"]').textContent=ether+" "+symbol;
-      row.querySelector('[data-k="nonce"]').textContent=nonce;
-      row.querySelector('[data-k="status"]').innerHTML='<span class="ok">OK</span>';
-      out.balance=ether; out.nonce=nonce;
-      sum+=parseFloat(ether||'0'); statSum.textContent=sum.toFixed(6)+" "+symbol;
+      row.querySelector('[data-k=bal]').textContent=ether+" "+symbol;
+      row.querySelector('[data-k=nonce]').textContent=nonce;
+      row.querySelector('[data-k=status]').innerHTML='<span class="ok">OK</span>';
+      out.balance=ether;out.nonce=nonce;
+      sum+=parseFloat(ether);statSum.textContent=sum.toFixed(6);
       return out;
     }catch(e){
-      row.querySelector('[data-k="status"]').innerHTML='<span class="err">ERR</span>';
-      row.querySelector('[data-k="msg"]').textContent=e.message||String(e);
-      out.status='ERR'; out.message=e.message||String(e);
-      return out;
+      row.querySelector('[data-k=status]').innerHTML='<span class="err">ERR</span>';
+      row.querySelector('[data-k=msg]').textContent=e.message;
+      out.status="ERR";out.message=e.message;return out;
     }
   }
 
   async function run(){
     controller.stop=false;results=[];tbody.innerHTML='';sum=0;statSum.textContent='0';
-    const addrs=normalizeAddrs(addrInput.value);
-    if(addrs.length===0) return alert('Isi alamat dulu');
-    const url=(rpcUrl.value||'').trim(); if(!url) return alert('Isi RPC URL');
-    symbol=customSymbol.value.trim()||'ether'; unitName.textContent=symbol;
-
-    const provider=new ethers.providers.JsonRpcProvider({url,timeout:Number(timeoutEl.value||15000)});
+    const addrs=normalizeAddrs(el('addrInput').value);statTotal.textContent=addrs.length;
+    const url=el('rpcUrl').value.trim();const symbol=(el('customSymbol').value||'ETH').toUpperCase();unitName.textContent=symbol;
+    if(!addrs.length) return alert('Isi alamat dulu'); if(!url) return alert('Isi RPC URL');
+    const provider=new ethers.providers.JsonRpcProvider({url,timeout:Number(el('timeout').value||15000)});
     const rows=addrs.map((a,i)=>addRow(i,a));
-    const start=Date.now(); let ok=0,err=0; let cursor=0; const pool=Math.min(20,Math.max(1,Number(concurrencyEl.value||6)));
-
+    let ok=0,err=0,start=Date.now();
+    let cursor=0,pool=Number(el('concurrency').value||6);
     async function worker(){
       while(!controller.stop && cursor<addrs.length){
-        const i=cursor++;
-        const res=await checkOne(provider,addrs[i],i,rows[i]);
-        results[i]=res; (res.status==='OK'?ok++:err++);
-        statOk.textContent=ok; statErr.textContent=err; statDur.textContent=((Date.now()-start)/1000).toFixed(1)+'s';
+        const i=cursor++;const res=await checkOne(provider,addrs[i],i,rows[i],symbol);
+        results[i]=res;(res.status==='OK'?ok++:err++);
+        statOk.textContent=ok;statErr.textContent=err;statDur.textContent=((Date.now()-start)/1000).toFixed(1)+'s';
       }
     }
     await Promise.all(Array.from({length:Math.min(pool,addrs.length)},worker));
   }
 
-  btnCheck.addEventListener('click',run);
-  btnStop.addEventListener('click',()=>controller.stop=true);
-
-  function exportSheet(type){
-    if(!results.length) return alert('Belum ada hasil');
-    const rows=[["#","Address","Balance ("+symbol+")","Nonce","Status","Message"]];
-    results.forEach(r=>rows.push([r?.index||'',r?.address||'',(r?.balance||'')+" "+symbol,r?.nonce||'',r?.status||'',r?.message||'']));
-    const ws=XLSX.utils.aoa_to_sheet(rows);
-    const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Wallets');
-    const fname='wallet-check-'+new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')+(type==='csv'?'.csv':'.xlsx');
-    if(type==='csv') XLSX.writeFile(wb,fname,{bookType:'csv'}); else XLSX.writeFile(wb,fname);
-  }
-  btnExportCsv.addEventListener('click',()=>exportSheet('csv'));
-  btnExportXlsx.addEventListener('click',()=>exportSheet('xlsx'));
+  el('btnCheck').onclick=run;el('btnStop').onclick=()=>controller.stop=true;
+  function exportSheet(type){if(!results.length) return alert('Belum ada hasil');const symbol=(el('customSymbol').value||'ETH').toUpperCase();const rows=[["#","Address","Balance ("+symbol+")","Nonce","Status","Message"]];results.forEach(r=>rows.push([r.index,r.address,r.balance? r.balance+" "+symbol:"",r.nonce,r.status,r.message]));const ws=XLSX.utils.aoa_to_sheet(rows);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Wallets');const fname='wallet-check-'+Date.now()+(type==='csv'?'.csv':'.xlsx');XLSX.writeFile(wb,fname,{bookType:type==='csv'?'csv':'xlsx'});}
+  el('btnExportCsv').onclick=()=>exportSheet('csv');el('btnExportXlsx').onclick=()=>exportSheet('xlsx');
 })();
 </script>
 </body>
