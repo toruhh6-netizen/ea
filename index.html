@@ -4,106 +4,104 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>EVM Multi Wallet Checker</title>
-  <!-- SheetJS for CSV/XLSX import/export -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <!-- Ethers v5 UMD (stabil, cocok di browser tanpa bundler) -->
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
   <style>
-    :root{--bg:#0b1020;--panel:#111827;--text:#e5e7eb;--muted:#94a3b8;--brand:#10b981;--border:#1f2a44}
+    :root{--bg:#0b1020;--panel:#0f172a;--text:#e5e7eb;--muted:#94a3b8;--brand:#10b981;--border:#1f2a44}
     *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial}
-    .container{max-width:1100px;margin:0 auto;padding:24px 16px}
+    body{margin:0;background:#0b1020;color:var(--text);font:14px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial}
+    .container{max-width:1200px;margin:0 auto;padding:24px 16px}
     .header{display:flex;gap:12px;align-items:center}
     .title{font-size:20px;font-weight:800}
-    .grid{display:grid;gap:16px;grid-template-columns:1fr 320px;margin-top:16px}
-    .card{background:var(--panel);border:1px solid var(--border);border-radius:12px}
-    .inner{padding:14px}
+    .grid{display:grid;gap:16px;grid-template-columns:1fr 320px}
+    .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+    .card .inner{padding:14px}
     label{display:block;color:var(--muted);font-size:12px;margin-top:8px}
-    textarea,input{width:100%;margin-top:6px;border-radius:8px;border:1px solid var(--border);background:#0e152a;color:var(--text);padding:10px 12px}
+    textarea,input,select{width:100%;margin-top:6px;border-radius:10px;border:1px solid var(--border);background:#0e152a;color:var(--text);padding:10px 12px}
     textarea{height:140px;resize:vertical}
     .row{display:flex;gap:8px;align-items:center}
-    .btn{display:inline-flex;align-items:center;gap:8px;border-radius:8px;border:1px solid var(--border);padding:10px 12px;background:#0f172a;color:#fff;cursor:pointer}
+    .btn{display:inline-flex;align-items:center;gap:8px;border-radius:10px;border:1px solid var(--border);padding:10px 12px;background:#111827;color:#fff;cursor:pointer}
     .btn.primary{background:var(--brand);border-color:var(--brand);color:#001b10;font-weight:700}
-    .btn:disabled{opacity:.6;cursor:not-allowed}
-    table{width:100%;border-collapse:collapse}
-    th,td{padding:10px 12px;border-bottom:1px solid var(--border);text-align:left}
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap}
+    table{width:100%;border-collapse:collapse;table-layout:auto}
+    th,td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
     th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
-    .pill{padding:.2rem .55rem;border:1px solid var(--border);border-radius:999px;font-size:12px;color:var(--muted)}
-    .ok{color:#34d399}.err{color:#fb7185}
-    .right{margin-left:auto}
+    td.address{word-break:break-all;max-width:100%}
     .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-    .log{white-space:pre-wrap;background:#0a1224;border:1px solid var(--border);border-radius:8px;padding:10px;color:#c7d2fe;max-height:120px;overflow:auto}
+    .pill{padding:.2rem .55rem;border:1px solid var(--border);border-radius:999px;font-size:12px;color:var(--muted)}
+    .ok{color:#34d399}
+    .err{color:#fb7185}
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
       <div class="title">⚡ EVM Multi Wallet Checker</div>
-      <div class="pill">HTML + JS + ethers v5 + SheetJS</div>
     </div>
 
-    <div class="grid">
-      <!-- LEFT: Inputs -->
-      <div class="card"><div class="inner">
-        <label>Wallet addresses (1 per line)</label>
-        <textarea id="addrInput" placeholder="0xabc...\n0xdef...\n0x..."></textarea>
-        <div class="row" style="margin-top:8px">
-          <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" />
-          <button class="btn" id="btnImport">Import CSV/XLSX</button>
-          <span class="pill" id="addrCount">0 addr</span>
+    <div class="grid" style="margin-top:16px">
+      <div class="card">
+        <div class="inner">
+          <label>Wallet addresses (1 per line)</label>
+          <textarea id="addrInput" placeholder="0xabc...\n0xdef...\n0x..."></textarea>
+          <div class="row" style="margin-top:8px">
+            <input type="file" id="fileInput" accept=".csv, .xlsx, .xls" />
+            <button class="btn" id="btnImport">Import CSV/XLSX</button>
+            <span class="pill" id="addrCount">0 addr</span>
+          </div>
+          <label style="margin-top:12px">Custom RPC URL</label>
+          <input id="rpcUrl" placeholder="https://rpc.ankr.com/eth"/>
+          <label>Concurrency</label>
+          <input id="concurrency" type="number" min="1" max="20" value="6"/>
+          <label>Timeout (ms)</label>
+          <input id="timeout" type="number" min="1000" step="500" value="15000"/>
+          <label>Custom Symbol</label>
+          <input id="customSymbol" placeholder="ETH / BNB / MATIC"/>
+          <div class="row" style="margin-top:10px">
+            <button class="btn primary" id="btnCheck">Check Wallets</button>
+            <button class="btn" id="btnStop">Stop</button>
+          </div>
+          <div class="row" style="margin-top:10px">
+            <button class="btn" id="btnExportCsv">Export CSV</button>
+            <button class="btn" id="btnExportXlsx">Export XLSX</button>
+          </div>
         </div>
-        <label style="margin-top:12px">Custom RPC URL</label>
-        <input id="rpcUrl" placeholder="https://rpc.ankr.com/eth"/>
-        <label>Concurrency</label>
-        <input id="concurrency" type="number" min="1" max="20" value="6"/>
-        <label>Timeout (ms) — optional</label>
-        <input id="timeout" type="number" min="2000" step="500" value="15000"/>
-        <div class="row" style="margin-top:10px">
-          <button class="btn primary" id="btnCheck">Check Wallets</button>
-          <button class="btn" id="btnStop">Stop</button>
-        </div>
-        <div class="row" style="margin-top:10px">
-          <button class="btn" id="btnExportCsv">Export CSV</button>
-          <button class="btn" id="btnExportXlsx">Export XLSX</button>
-        </div>
-        <div class="log" id="log" style="margin-top:10px"></div>
-      </div></div>
+      </div>
 
-      <!-- RIGHT: Results -->
-      <div class="card"><div class="inner">
-        <div class="row" style="gap:8px;flex-wrap:wrap">
-          <span class="pill">Total: <span id="statTotal">0</span></span>
-          <span class="pill ok">OK: <span id="statOk">0</span></span>
-          <span class="pill err">ERR: <span id="statErr">0</span></span>
-          <span class="pill right">Duration: <span id="statDur">0s</span></span>
-          <span class="pill right">Total Balance: <span id="statSum">0</span></span>
-          <span class="pill">Unit: <span id="unitName">ether</span></span>
+      <div class="card">
+        <div class="inner">
+          <div class="row toolbar">
+            <span class="pill">Total: <span id="statTotal">0</span></span>
+            <span class="pill ok">OK: <span id="statOk">0</span></span>
+            <span class="pill err">ERR: <span id="statErr">0</span></span>
+            <span class="pill">Total Balance: <span id="statSum">0</span></span>
+            <span class="pill">Unit: <span id="unitName">ether</span></span>
+            <span class="pill right">Duration: <span id="statDur">0s</span></span>
+          </div>
+          <div style="overflow:auto; max-height: 60vh; margin-top:8px">
+            <table id="resultTable">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Address</th>
+                  <th>Balance</th>
+                  <th>Nonce</th>
+                  <th>Status</th>
+                  <th>Message</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
         </div>
-        <div style="overflow:auto;max-height:60vh;margin-top:8px">
-          <table id="resultTable">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Address</th>
-                <th class="right">Balance</th>
-                <th>Nonce</th>
-                <th>Status</th>
-                <th>Message</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </div></div>
+      </div>
     </div>
-
-    <footer style="margin-top:12px;color:var(--muted);font-size:12px">Tip RPC publik: https://rpc.ankr.com/eth • /bsc • /polygon • /arbitrum • /avalanche</footer>
   </div>
 
 <script>
 (() => {
   const { ethers } = window;
-  const el = id => document.getElementById(id);
+  const el = (id) => document.getElementById(id);
   const addrInput = el('addrInput');
   const fileInput = el('fileInput');
   const btnImport = el('btnImport');
@@ -114,6 +112,7 @@
   const rpcUrl = el('rpcUrl');
   const concurrencyEl = el('concurrency');
   const timeoutEl = el('timeout');
+  const customSymbol = el('customSymbol');
   const unitName = el('unitName');
   const statTotal = el('statTotal');
   const statOk = el('statOk');
@@ -121,29 +120,22 @@
   const statDur = el('statDur');
   const statSum = el('statSum');
   const tbody = document.querySelector('#resultTable tbody');
-  const logBox = el('log');
 
-  const chainSymbols = {1:'ETH',56:'BNB',137:'MATIC',43114:'AVAX',42161:'ARB',10:'OP',11155111:'Sepolia'};
-
-  let controller = { stop:false };
+  let controller = { stop: false };
   let results = [];
-  let symbol = 'NATIVE';
   let sum = 0;
+  let symbol = 'ether';
 
-  function log(msg){ logBox.textContent += (msg + "\n"); logBox.scrollTop = logBox.scrollHeight; }
+  const normalizeAddrs = (text) => (text||'').split(/\r?\n|,|\s+/).map(s=>s.trim()).filter(Boolean);
 
-  function normalizeAddrs(text){
-    return (text||'').split(/\r?\n|,|\s+/).map(s=>s.trim()).filter(Boolean);
-  }
-  function setAddrCount(){
-    const n = normalizeAddrs(addrInput.value).length;
-    el('addrCount').textContent = n + ' addr';
-    statTotal.textContent = n;
-  }
-  addrInput.addEventListener('input', setAddrCount);
-  setAddrCount();
+  const setCount = () => {
+    const count = normalizeAddrs(addrInput.value).length;
+    el('addrCount').textContent = count + ' addr';
+    statTotal.textContent = count;
+  };
+  addrInput.addEventListener('input', setCount);
+  setCount();
 
-  // Import CSV/XLSX
   async function readFile(file){
     const data = await file.arrayBuffer();
     const wb = XLSX.read(data, { type:'array' });
@@ -151,103 +143,80 @@
     const rows = XLSX.utils.sheet_to_json(sheet, { header:1, raw:true });
     return rows.flat().map(v => String(v).trim()).filter(Boolean);
   }
-  btnImport.addEventListener('click', async () => {
+
+  btnImport.addEventListener('click', async()=>{
     const f = fileInput.files && fileInput.files[0];
     if(!f) return alert('Pilih file CSV/XLSX dulu');
-    try{
-      const addrs = await readFile(f);
-      const merged = [...normalizeAddrs(addrInput.value), ...addrs];
-      const uniq = Array.from(new Map(merged.map(a => [a.toLowerCase(), a])).values());
-      addrInput.value = uniq.join('\n');
-      setAddrCount();
-      log('Imported ' + addrs.length + ' addresses');
-    }catch(e){ alert('Gagal import: '+e.message); }
+    const addrs = await readFile(f);
+    const merged = [...normalizeAddrs(addrInput.value), ...addrs];
+    const uniq = Array.from(new Map(merged.map(a=>[a.toLowerCase(),a])).values());
+    addrInput.value = uniq.join('\n');
+    setCount();
   });
 
   function addRow(i,address){
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td class="small">${i+1}</td>
-      <td class="mono">${address}</td>
-      <td class="mono right" data-k="bal">-</td>
-      <td class="mono" data-k="nonce">-</td>
-      <td class="small" data-k="status">…</td>
-      <td class="small" data-k="msg"></td>`;
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${i+1}</td><td class="mono address">${address}</td><td data-k="bal">-</td><td data-k="nonce">-</td><td data-k="status">…</td><td data-k="msg"></td>`;
     tbody.appendChild(tr); return tr;
   }
 
-  async function checkOne(provider, address, i, row){
-    const out = { index:i+1, address, balance:null, nonce:null, status:'OK', message:'' };
+  async function checkOne(provider,address,i,row){
+    const out={index:i+1,address,balance:null,nonce:null,status:'OK',message:''};
     try{
       if(!ethers.utils.isAddress(address)) throw new Error('Invalid address');
-      const balWei = await provider.getBalance(address);
-      const nonce = await provider.getTransactionCount(address);
-      const bal = ethers.utils.formatEther(balWei);
-      row.querySelector('[data-k="bal"]').textContent = bal + ' ' + symbol;
-      row.querySelector('[data-k="nonce"]').textContent = nonce;
-      row.querySelector('[data-k="status"]').innerHTML = '<span class="ok">OK</span>';
-      out.balance = bal; out.nonce = nonce;
-      sum += parseFloat(bal||'0'); statSum.textContent = sum.toFixed(6) + ' ' + symbol;
+      const balWei=await provider.getBalance(address);
+      const nonce=await provider.getTransactionCount(address);
+      const ether=ethers.utils.formatEther(balWei);
+      row.querySelector('[data-k="bal"]').textContent=ether+" "+symbol;
+      row.querySelector('[data-k="nonce"]').textContent=nonce;
+      row.querySelector('[data-k="status"]').innerHTML='<span class="ok">OK</span>';
+      out.balance=ether; out.nonce=nonce;
+      sum+=parseFloat(ether||'0'); statSum.textContent=sum.toFixed(6)+" "+symbol;
       return out;
     }catch(e){
-      row.querySelector('[data-k="status"]').innerHTML = '<span class="err">ERR</span>';
-      row.querySelector('[data-k="msg"]').textContent = e.message || String(e);
-      out.status = 'ERR'; out.message = e.message || String(e);
+      row.querySelector('[data-k="status"]').innerHTML='<span class="err">ERR</span>';
+      row.querySelector('[data-k="msg"]').textContent=e.message||String(e);
+      out.status='ERR'; out.message=e.message||String(e);
       return out;
     }
   }
 
   async function run(){
-    try{
-      controller.stop = false; results = []; tbody.innerHTML = ''; sum = 0; statSum.textContent = '0'; statOk.textContent = 0; statErr.textContent = 0; logBox.textContent='';
-      const addrs = normalizeAddrs(addrInput.value);
-      if(addrs.length===0) return alert('Isi alamat dulu');
-      const url = (rpcUrl.value||'').trim(); if(!url) return alert('Isi RPC URL');
+    controller.stop=false;results=[];tbody.innerHTML='';sum=0;statSum.textContent='0';
+    const addrs=normalizeAddrs(addrInput.value);
+    if(addrs.length===0) return alert('Isi alamat dulu');
+    const url=(rpcUrl.value||'').trim(); if(!url) return alert('Isi RPC URL');
+    symbol=customSymbol.value.trim()||'ether'; unitName.textContent=symbol;
 
-      // Provider sederhana (hindari opsi rumit biar minim error)
-      const provider = new ethers.providers.JsonRpcProvider(url);
-      const net = await provider.getNetwork();
-      symbol = chainSymbols[Number(net.chainId)] || 'NATIVE';
-      unitName.textContent = symbol;
-      log('Connected. chainId=' + Number(net.chainId) + ' symbol=' + symbol);
+    const provider=new ethers.providers.JsonRpcProvider({url,timeout:Number(timeoutEl.value||15000)});
+    const rows=addrs.map((a,i)=>addRow(i,a));
+    const start=Date.now(); let ok=0,err=0; let cursor=0; const pool=Math.min(20,Math.max(1,Number(concurrencyEl.value||6)));
 
-      // pre-render rows
-      const rows = addrs.map((a,i)=>addRow(i,a));
-
-      const start = Date.now();
-      let ok=0, err=0; statTotal.textContent = addrs.length;
-      let cursor = 0; const pool = Math.max(1, Math.min(20, Number(concurrencyEl.value||6)));
-
-      async function worker(){
-        while(!controller.stop && cursor < addrs.length){
-          const i = cursor++;
-          const res = await checkOne(provider, addrs[i], i, rows[i]);
-          results[i] = res; (res.status==='OK'? ok++ : err++);
-          statOk.textContent = ok; statErr.textContent = err; statDur.textContent = ((Date.now()-start)/1000).toFixed(1)+'s';
-        }
+    async function worker(){
+      while(!controller.stop && cursor<addrs.length){
+        const i=cursor++;
+        const res=await checkOne(provider,addrs[i],i,rows[i]);
+        results[i]=res; (res.status==='OK'?ok++:err++);
+        statOk.textContent=ok; statErr.textContent=err; statDur.textContent=((Date.now()-start)/1000).toFixed(1)+'s';
       }
-      await Promise.all(Array.from({length: Math.min(pool, addrs.length)}, worker));
-    }catch(e){
-      log('ERROR: ' + (e.message||e));
-      alert('Gagal menjalankan cek: ' + (e.message||e));
     }
+    await Promise.all(Array.from({length:Math.min(pool,addrs.length)},worker));
   }
 
-  btnCheck.addEventListener('click', run);
-  btnStop.addEventListener('click', ()=> controller.stop = true);
+  btnCheck.addEventListener('click',run);
+  btnStop.addEventListener('click',()=>controller.stop=true);
 
   function exportSheet(type){
     if(!results.length) return alert('Belum ada hasil');
-    const rows = [['#','Address','Balance ('+symbol+')','Nonce','Status','Message']];
-    results.forEach(r => rows.push([r?.index||'', r?.address||'', (r?.balance||'') + ' ' + symbol, r?.nonce||'', r?.status||'', r?.message||'']));
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Wallets');
-    const fname = 'wallet-check-'+new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')+(type==='csv'?'.csv':'.xlsx');
-    XLSX.writeFile(wb, fname, { bookType: type==='csv'?'csv':'xlsx' });
+    const rows=[["#","Address","Balance ("+symbol+")","Nonce","Status","Message"]];
+    results.forEach(r=>rows.push([r?.index||'',r?.address||'',(r?.balance||'')+" "+symbol,r?.nonce||'',r?.status||'',r?.message||'']));
+    const ws=XLSX.utils.aoa_to_sheet(rows);
+    const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Wallets');
+    const fname='wallet-check-'+new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')+(type==='csv'?'.csv':'.xlsx');
+    if(type==='csv') XLSX.writeFile(wb,fname,{bookType:'csv'}); else XLSX.writeFile(wb,fname);
   }
-  btnExportCsv.addEventListener('click', ()=>exportSheet('csv'));
-  btnExportXlsx.addEventListener('click', ()=>exportSheet('xlsx'));
+  btnExportCsv.addEventListener('click',()=>exportSheet('csv'));
+  btnExportXlsx.addEventListener('click',()=>exportSheet('xlsx'));
 })();
 </script>
 </body>
