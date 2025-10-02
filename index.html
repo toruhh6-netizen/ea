@@ -13,7 +13,7 @@
     .container{max-width:1200px;margin:0 auto;padding:24px 16px}
     .header{display:flex;gap:12px;align-items:center}
     .title{font-size:20px;font-weight:800}
-    .grid{display:grid;gap:16px;grid-template-columns:1fr 320px}
+    .grid{display:grid;gap:16px;grid-template-columns:380px 1fr}
     .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
     .card .inner{padding:14px}
     label{display:block;color:var(--muted);font-size:12px;margin-top:8px}
@@ -23,11 +23,13 @@
     .btn{display:inline-flex;align-items:center;gap:8px;border-radius:10px;border:1px solid var(--border);padding:10px 12px;background:#111827;color:#fff;cursor:pointer}
     .btn.primary{background:var(--brand);border-color:var(--brand);color:#001b10;font-weight:700}
     .toolbar{display:flex;gap:8px;flex-wrap:wrap}
-    table{width:100%;border-collapse:collapse;table-layout:auto}
+    table{width:100%;border-collapse:collapse;table-layout:fixed}
     th,td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
     th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
     td.address{word-break:break-all;max-width:100%}
     .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    td.address{word-break:break-word;white-space:normal;max-width:100%}
+    th:nth-child(2), td:nth-child(2){width:100%}
     .pill{padding:.2rem .55rem;border:1px solid var(--border);border-radius:999px;font-size:12px;color:var(--muted)}
     .ok{color:#34d399}
     .err{color:#fb7185}
@@ -70,7 +72,7 @@
 
       <div class="card">
         <div class="inner">
-          <div class="row toolbar">
+          <div class="row toolbar" style="align-items:center">
             <span class="pill">Total: <span id="statTotal">0</span></span>
             <span class="pill ok">OK: <span id="statOk">0</span></span>
             <span class="pill err">ERR: <span id="statErr">0</span></span>
@@ -78,7 +80,7 @@
             <span class="pill">Unit: <span id="unitName">ether</span></span>
             <span class="pill right">Duration: <span id="statDur">0s</span></span>
           </div>
-          <div style="overflow:auto; max-height: 60vh; margin-top:8px">
+          <div class="results-wrap" style="overflow-y:auto; overflow-x:hidden; max-height:70vh; margin-top:8px">
             <table id="resultTable">
               <thead>
                 <tr>
