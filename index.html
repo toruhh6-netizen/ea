@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>EVM Multi Wallet Checker</title>
+  <title>EVM Multi Wallet Checker (Multi-Chain)</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
   <style>
@@ -11,31 +11,54 @@
     .container{max-width:1200px;margin:0 auto;padding:20px}
     .header{display:flex;justify-content:space-between;align-items:center}
     .grid{display:grid;gap:18px;grid-template-columns:420px 1fr;margin-top:16px}
-    .card{background:#111827;border-radius:10px;padding:14px}
-    textarea,input{width:100%;padding:10px 12px;margin-top:6px;border-radius:8px;border:1px solid #1f2a44;background:#0e152a;color:#e5e7eb}
+    .card{background:#111827;border-radius:12px;padding:14px;border:1px solid #1f2a44}
+    textarea,input,select{width:100%;padding:10px 12px;margin-top:6px;border-radius:10px;border:1px solid #1f2a44;background:#0e152a;color:#e5e7eb}
     textarea{height:160px;resize:vertical}
-    button{margin-top:8px;padding:10px 12px;border:0;border-radius:8px;cursor:pointer}
+    button{margin-top:8px;padding:10px 12px;border:0;border-radius:10px;cursor:pointer}
     button.primary{background:#10b981;color:#001b10;font-weight:700}
+    button.ghost{background:#1f2937;color:#e5e7eb}
+    button.danger{background:#dc2626;color:#fff}
+    button.success{background:#22c55e;color:#fff;font-weight:600}
     table{width:100%;border-collapse:collapse;table-layout:auto}
     th,td{padding:8px;border-bottom:1px solid #1f2a44;text-align:left}
+    th{color:#9ca3af;font-weight:600}
     td.address{word-break:break-all;white-space:normal}
     .pill{padding:4px 8px;border:1px solid #1f2a44;border-radius:999px;font-size:12px;margin-right:6px}
     .ok{color:#34d399}.err{color:#fb7185}
     .stats{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
-    .total-balance{font-size:18px;font-weight:bold;text-align:right;margin-top:12px}
+    .total{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+    .totline{font-size:16px;font-weight:700}
     .form{display:flex;flex-direction:column;gap:10px}
     .form-group label{font-size:12px;color:#94a3b8;margin-bottom:4px;display:block}
-    .row{display:flex;gap:8px;align-items:center}
-    .filters{margin:8px 0;display:flex;gap:8px}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .filters{margin:8px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
     .filters button{background:#1f2937;color:#e5e7eb}
     .filters button.active{background:#10b981;color:#001b10;font-weight:700}
+    #filterCount{font-size:12px;color:#94a3b8}
+    .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;font-size:12px;color:#fff}
+    .chip .x{background:rgba(0,0,0,0.3);border:0;padding:2px 6px;border-radius:999px;cursor:pointer;color:#fff}
+    .divider{height:1px;background:#1f2a44;margin:8px 0}
+    /* warna per chain */
+    .chip.ETH{background:#2563eb}
+    .chip.BNB{background:#f59e0b}
+    .chip.MATIC{background:#7c3aed}
+    .chip.Base{background:#06b6d4}
+    .chip.Arbitrum{background:#4b5563}
+    .chip.custom{background:#6b7280}
+    .summary{margin-top:12px;font-size:14px;line-height:1.5}
+    .summary h4{margin:6px 0;color:#94a3b8}
   </style>
 </head>
 <body>
 <div class="container">
-  <div class="header"><h2>⚡ EVM Multi Wallet Checker</h2><span style="font-size:12px;color:#94a3b8">ethers.js + SheetJS</span></div>
+  <div class="header">
+    <h2>⚡ EVM Multi Wallet Checker (Multi-Chain)</h2>
+    <span style="font-size:12px;color:#94a3b8">ethers.js + SheetJS</span>
+  </div>
 
   <div class="grid">
+    <!-- LEFT -->
     <div class="card">
       <div class="form">
         <div class="form-group">
@@ -43,6 +66,7 @@
           <textarea id="addrInput" placeholder="0xabc...
 0xdef..."></textarea>
         </div>
+
         <div class="form-group">
           <label>Import from CSV/XLSX</label>
           <div class="row">
@@ -51,10 +75,41 @@
             <span class="pill" id="addrCount">0 addr</span>
           </div>
         </div>
+
+        <!-- preset -->
+        <div class="form-group">
+          <label>Pilih RPC Default</label>
+          <div class="row" style="width:100%">
+            <select id="rpcPreset">
+              <option value="">— Pilih Network Preset —</option>
+              <option value="Ethereum|https://eth-mainnet.public.blastapi.io|ETH">Ethereum (ETH)</option>
+              <option value="BSC|https://bsc-mainnet.public.blastapi.io|BNB">BSC (BNB)</option>
+              <option value="Base|https://base-mainnet.public.blastapi.io|ETH">Base (ETH)</option>
+              <option value="Arbitrum|https://arbitrum-one.public.blastapi.io|ETH">Arbitrum (ETH)</option>
+              <option value="Polygon|https://polygon-mainnet.public.blastapi.io|MATIC">Polygon (MATIC)</option>
+            </select>
+            <button class="success" id="btnAddPreset">Tambah</button>
+            <button class="danger" id="btnClearAll">Hapus Semua</button>
+          </div>
+          <div id="chosenChains" class="chips"></div>
+          <div class="divider"></div>
+        </div>
+
+        <!-- custom rpc -->
         <div class="form-group">
           <label>Custom RPC URL</label>
           <input id="rpcUrl" placeholder="https://rpc.ankr.com/eth"/>
         </div>
+        <div class="form-group">
+          <label>Symbol</label>
+          <input id="customSymbol" placeholder="ETH"/>
+        </div>
+        <div class="row">
+          <button class="success" id="btnAddCustom">Tambah Custom</button>
+        </div>
+
+        <div class="divider"></div>
+
         <div class="form-group">
           <label>Concurrency</label>
           <input id="concurrency" type="number" value="6"/>
@@ -63,10 +118,7 @@
           <label>Timeout (ms)</label>
           <input id="timeout" type="number" value="15000"/>
         </div>
-        <div class="form-group">
-          <label>Custom Symbol</label>
-          <input id="customSymbol" placeholder="ETH"/>
-        </div>
+
         <div class="row" style="gap:8px;flex-wrap:wrap">
           <button class="primary" id="btnCheck">Check Wallets</button>
           <button id="btnStop">Stop</button>
@@ -76,6 +128,7 @@
       </div>
     </div>
 
+    <!-- RIGHT -->
     <div class="card">
       <div class="stats">
         <span class="pill">Total: <span id="statTotal">0</span></span>
@@ -83,25 +136,32 @@
         <span class="pill err">ERR: <span id="statErr">0</span></span>
         <span class="pill">Duration: <span id="statDur">0s</span></span>
       </div>
-      
-      <!-- tombol filter -->
+
       <div class="filters">
         <button id="filterAll" class="active">Semua</button>
         <button id="filterAda">Ada Saldo</button>
         <button id="filterKosong">Kosong</button>
+        <span id="filterCount">Menampilkan 0 wallet</span>
       </div>
 
       <div style="overflow-y:auto;max-height:60vh">
         <table id="resultTable">
           <thead>
             <tr>
-              <th>#</th><th>Address</th><th>Balance</th><th>Nonce</th><th>Status</th><th>Message</th>
+              <th>#</th><th>Chain</th><th>Address</th><th>Balance</th><th>Nonce</th><th>Status</th><th>Message</th>
             </tr>
           </thead>
           <tbody></tbody>
         </table>
       </div>
-      <div class="total-balance">Total Balance: <span id="statSum">0</span> <span id="unitName">ETH</span></div>
+
+      <div class="summary">
+        <h4>Summary Per Chain:</h4>
+        <div id="chainSummary">-</div>
+      </div>
+      <div class="total">
+        <span class="totline">Total Balance: <span id="statSum">0</span></span>
+      </div>
     </div>
   </div>
 </div>
@@ -109,41 +169,95 @@
 <script>
 (() => {
   const { ethers } = window;
-  const el = id => document.getElementById(id);
-  const tbody = document.querySelector('#resultTable tbody');
-  const statTotal=el('statTotal'), statOk=el('statOk'), statErr=el('statErr'), statDur=el('statDur'), statSum=el('statSum'), unitName=el('unitName');
-  let controller={stop:false}, results=[], sum=0;
+  const el=id=>document.getElementById(id);
+  const tbody=document.querySelector('#resultTable tbody');
+  const statTotal=el('statTotal'), statOk=el('statOk'), statErr=el('statErr'), statDur=el('statDur'), statSum=el('statSum');
+  const filterCount=el('filterCount');const chainSummaryEl=el('chainSummary');
 
-  const normalizeAddrs = text => (text||'').split(/\r?\n|,|\s+/).map(s=>s.trim()).filter(Boolean);
+  // === LocalStorage keys ===
+  const LS_CHAINS = 'mc_selected_chains';
+  const LS_CONC   = 'mc_concurrency';
+  const LS_TO     = 'mc_timeout';
+  const LS_RPC    = 'mc_custom_rpc';
+  const LS_SYM    = 'mc_custom_symbol';
 
-  function addRow(i,addr){
+  // state
+  let controller={stop:false}, results=[], selectedChains=[];
+
+  // load persisted
+  try{
+    const sc = JSON.parse(localStorage.getItem(LS_CHAINS)||'[]');
+    if(Array.isArray(sc)) selectedChains = sc;
+  }catch{}
+  el('concurrency').value = localStorage.getItem(LS_CONC) || 6;
+  el('timeout').value     = localStorage.getItem(LS_TO) || 15000;
+  el('rpcUrl').value      = localStorage.getItem(LS_RPC) || '';
+  el('customSymbol').value= localStorage.getItem(LS_SYM) || '';
+
+  // persist on change
+  el('concurrency').addEventListener('change', ()=>localStorage.setItem(LS_CONC, el('concurrency').value));
+  el('timeout').addEventListener('change', ()=>localStorage.setItem(LS_TO, el('timeout').value));
+  el('rpcUrl').addEventListener('change', ()=>localStorage.setItem(LS_RPC, el('rpcUrl').value.trim()));
+  el('customSymbol').addEventListener('change', ()=>localStorage.setItem(LS_SYM, el('customSymbol').value.trim().toUpperCase()));
+
+  // chips
+  function renderChosenChains(){
+    const wrap=el('chosenChains');wrap.innerHTML='';
+    if(!selectedChains.length){ wrap.innerHTML='<span style="font-size:12px;color:#94a3b8">Belum ada chain terpilih</span>'; return; }
+    selectedChains.forEach((c,idx)=>{
+      const chip=document.createElement('div');
+      chip.className=`chip ${c.symbol||'custom'}`;
+      chip.innerHTML=`<strong>${c.name}</strong> (${c.symbol})`;
+      const btn=document.createElement('button');
+      btn.className='x';btn.textContent='×';
+      btn.onclick=()=>{ selectedChains.splice(idx,1); saveChains(); renderChosenChains(); };
+      chip.appendChild(btn);wrap.appendChild(chip);
+    });
+  }
+  function saveChains(){ localStorage.setItem(LS_CHAINS, JSON.stringify(selectedChains)); }
+
+  // preset add/clear
+  el('btnAddPreset').onclick=()=>{
+    const v=el('rpcPreset').value;if(!v) return;
+    const [name,url,symbol]=v.split('|');
+    if(selectedChains.some(c=>c.url===url)) return alert('Sudah ada');
+    selectedChains.push({name,url,symbol}); saveChains(); renderChosenChains();
+  };
+  el('btnClearAll').onclick=()=>{
+    if(confirm('Yakin hapus semua chain terpilih?')){
+      selectedChains=[]; saveChains(); renderChosenChains();
+    }
+  };
+
+  // add custom
+  el('btnAddCustom').onclick=()=>{
+    const url=el('rpcUrl').value.trim();
+    const symbol=(el('customSymbol').value||'').trim().toUpperCase();
+    if(!url || !symbol) return alert('Isi Custom RPC dan Symbol dulu');
+    if(selectedChains.some(c=>c.url===url)) return alert('RPC sudah ada di daftar');
+    selectedChains.push({name:'Custom',url,symbol}); saveChains(); renderChosenChains();
+  };
+
+  renderChosenChains();
+
+  // helper
+  function addRow(i,chain,addr,sym){
     const tr=document.createElement('tr');
-    tr.innerHTML=`
-      <td>${i+1}</td>
-      <td class="address">${addr}</td>
-      <td data-k="bal">-</td>
-      <td data-k="nonce">-</td>
-      <td data-k="status">…</td>
-      <td data-k="msg"></td>`;
+    tr.innerHTML=`<td>${i+1}</td><td>${chain}</td><td class="address">${addr}</td><td data-k="bal">-</td><td data-k="nonce">-</td><td data-k="status">…</td><td data-k="msg"></td>`;
     tbody.appendChild(tr);return tr;
   }
 
-  async function checkOne(provider,addr,i,row,symbol){
-    const out={index:i+1,address:addr,balance:null,nonce:null,status:"OK",message:""};
+  async function checkOne(provider,addr,i,row,symbol,chain){
+    const out={index:i+1,chain,symbol,address:addr,balance:null,nonce:null,status:"OK",message:""};
     try{
       if(!ethers.utils.isAddress(addr)) throw new Error("Invalid address");
       const balWei=await provider.getBalance(addr);
       const nonce=await provider.getTransactionCount(addr);
-      const ether=ethers.utils.formatEther(balWei);
-      const etherNum=parseFloat(ether);
-
+      const ether=ethers.utils.formatEther(balWei);const etherNum=parseFloat(ether);
       row.querySelector('[data-k=bal]').textContent=ether+" "+symbol;
       row.querySelector('[data-k=nonce]').textContent=nonce;
       row.querySelector('[data-k=status]').innerHTML='<span class="ok">OK</span>';
-
-      out.balance=etherNum;out.nonce=nonce;
-      sum+=etherNum;statSum.textContent=sum.toFixed(6);
-      return out;
+      out.balance=etherNum;out.nonce=nonce;return out;
     }catch(e){
       row.querySelector('[data-k=status]').innerHTML='<span class="err">ERR</span>';
       row.querySelector('[data-k=msg]').textContent=e.message;
@@ -151,86 +265,89 @@
     }
   }
 
+  function updateFilterCount(){
+    const activeBtn=document.querySelector('.filters button.active');
+    if(activeBtn.id==='filterAll') applyFilter('all');
+    if(activeBtn.id==='filterAda') applyFilter('ada');
+    if(activeBtn.id==='filterKosong') applyFilter('kosong');
+  }
+
+  function updateSummary(){
+    const summary={};let total=0;
+    results.forEach(r=>{
+      if(r && r.status==="OK"){
+        summary[r.symbol]=(summary[r.symbol]||0)+(r.balance||0);
+        total += (r.balance||0);
+      }
+    });
+    if(!Object.keys(summary).length){ chainSummaryEl.textContent='-'; statSum.textContent='0'; return; }
+    chainSummaryEl.innerHTML=Object.entries(summary).map(([sym,t])=>`${sym}: ${t.toFixed(6)}`).join('<br>');
+    statSum.textContent = total.toFixed(6);
+  }
+
+  // run
   async function run(){
-    controller.stop=false;results=[];tbody.innerHTML='';sum=0;statSum.textContent='0';
-    const addrs=normalizeAddrs(el('addrInput').value);statTotal.textContent=addrs.length;
-    const url=el('rpcUrl').value.trim();const symbol=(el('customSymbol').value||'ETH').toUpperCase();unitName.textContent=symbol;
-    if(!addrs.length) return alert('Isi alamat dulu'); if(!url) return alert('Isi RPC URL');
-    const provider=new ethers.providers.JsonRpcProvider({url,timeout:Number(el('timeout').value||15000)});
-    const rows=addrs.map((a,i)=>addRow(i,a));
-    let ok=0,err=0,start=Date.now();
-    let cursor=0,pool=Number(el('concurrency').value||6);
+    controller.stop=false;results=[];tbody.innerHTML='';
+    const addrs=(el('addrInput').value||'').split(/\r?\n|,|\s+/).map(s=>s.trim()).filter(Boolean);
+    if(!addrs.length) return alert('Isi alamat dulu');
+    let chains=[...selectedChains];
+    const customUrl=el('rpcUrl').value.trim(); const customSym=(el('customSymbol').value||'').trim().toUpperCase();
+    if(customUrl && customSym) chains.push({name:'Custom',url:customUrl,symbol:customSym});
+    if(!chains.length) return alert('Pilih minimal 1 chain');
+
+    statTotal.textContent=addrs.length*chains.length;
+    let ok=0,err=0,start=Date.now();let cursor=0;
+    const pool=Number(el('concurrency').value||6); const timeout=Number(el('timeout').value||15000);
+
+    const jobs=[]; chains.forEach(c=>addrs.forEach(addr=>jobs.push({url:c.url,sym:c.symbol,addr,chain:c.name})));
+    const rows=jobs.map((job,i)=>addRow(i,job.chain,job.addr,job.sym));
+
     async function worker(){
-      while(!controller.stop && cursor<addrs.length){
-        const i=cursor++;const res=await checkOne(provider,addrs[i],i,rows[i],symbol);
-        results[i]=res;(res.status==='OK'?ok++:err++);
-        statOk.textContent=ok;statErr.textContent=err;statDur.textContent=((Date.now()-start)/1000).toFixed(1)+'s';
+      while(!controller.stop && cursor<jobs.length){
+        const j=cursor++; const job=jobs[j]; const row=rows[j];
+        const provider=new ethers.providers.JsonRpcProvider({url:job.url,timeout});
+        const res=await checkOne(provider,job.addr,j,row,job.sym,job.chain);
+        results[j]=res; (res.status==='OK'?ok++:err++);
+        statOk.textContent=ok; statErr.textContent=err; statDur.textContent=((Date.now()-start)/1000).toFixed(1)+'s';
+        updateFilterCount(); updateSummary();
       }
     }
-    await Promise.all(Array.from({length:Math.min(pool,addrs.length)},worker));
+    await Promise.all(Array.from({length:Math.min(pool,jobs.length)},worker));
   }
 
-  el('btnCheck').onclick=run;el('btnStop').onclick=()=>controller.stop=true;
+  el('btnCheck').onclick=run; el('btnStop').onclick=()=>controller.stop=true;
 
-  // Import CSV/XLSX
-  const fileInput = document.getElementById('fileInput');
-  const btnImport = document.getElementById('btnImport');
-  const addrInput = document.getElementById('addrInput');
-  const addrCount = document.getElementById('addrCount');
-
-  btnImport.onclick = async () => {
-    const f = fileInput.files?.[0];
-    if(!f) return alert('Pilih file dulu');
-    const buf = await f.arrayBuffer();
-    const wb = XLSX.read(buf, {type:'array'});
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(ws, {header:1});
-    const addrs = rows.flat().map(x=>String(x||'').trim()).filter(Boolean);
-    addrInput.value = addrs.join('\n');
-    addrCount.textContent = addrs.length+' addr';
+  // import
+  el('btnImport').onclick=async()=>{
+    const f=el('fileInput').files?.[0]; if(!f) return alert('Pilih file dulu');
+    const buf=await f.arrayBuffer(); const wb=XLSX.read(buf,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]]; const rows=XLSX.utils.sheet_to_json(ws,{header:1});
+    const addrs=rows.flat().map(x=>String(x||'').trim()).filter(Boolean);
+    el('addrInput').value=addrs.join('\n'); el('addrCount').textContent=addrs.length+' addr';
   };
 
-  // Export CSV/XLSX
+  // export
   function exportSheet(type){
     if(!results.length) return alert('Belum ada hasil');
-    const symbol=(el('customSymbol').value||'ETH').toUpperCase();
-    const rows=[["#","Address","Balance ("+symbol+")","Nonce","Status","Message"]];
-    results.forEach(r=>{
-      rows.push([
-        r.index,
-        r.address,
-        r.balance != null ? r.balance+" "+symbol : "",
-        r.nonce ?? "",
-        r.status,
-        r.message || ""
-      ]);
-    });
-    const ws=XLSX.utils.aoa_to_sheet(rows);
-    const wb=XLSX.utils.book_new();
+    const rows=[["#","Chain","Address","Balance","Nonce","Status","Message"]];
+    results.forEach(r=>rows.push([r.index,r.chain,r.address,r.balance!=null?r.balance+" "+r.symbol:"",r.nonce??"",r.status,r.message||""]));
+    const ws=XLSX.utils.aoa_to_sheet(rows); const wb=XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb,ws,'Wallets');
-    const fname='wallet-check-'+Date.now()+(type==='csv'?'.csv':'.xlsx');
-    XLSX.writeFile(wb,fname,{bookType:type==='csv'?'csv':'xlsx'});
+    XLSX.writeFile(wb,'wallet-check-'+Date.now()+(type==='csv'?'.csv':'.xlsx'),{bookType:type==='csv'?'csv':'xlsx'});
   }
-  el('btnExportCsv').onclick=()=>exportSheet('csv');
-  el('btnExportXlsx').onclick=()=>exportSheet('xlsx');
+  el('btnExportCsv').onclick=()=>exportSheet('csv'); el('btnExportXlsx').onclick=()=>exportSheet('xlsx');
 
-  // === FILTER FITUR ===
-  function setActive(btn){
-    document.querySelectorAll('.filters button').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-  }
+  // filter
+  function setActive(btn){document.querySelectorAll('.filters button').forEach(b=>b.classList.remove('active')); btn.classList.add('active');}
   function applyFilter(type){
-    const rows = tbody.querySelectorAll('tr');
-    rows.forEach((row, i)=>{
-      const balCell = row.querySelector('[data-k=bal]');
-      const balText = balCell.textContent.split(" ")[0];
-      const bal = parseFloat(balText)||0;
-      if(type==='all'){ row.style.display=''; }
-      if(type==='ada'){ row.style.display = bal>0 ? '' : 'none'; }
-      if(type==='kosong'){ row.style.display = bal===0 ? '' : 'none'; }
+    const rows=tbody.querySelectorAll('tr'); let visible=0;
+    rows.forEach(row=>{
+      const balText=(row.querySelector('[data-k=bal]').textContent.split(' ')[0]||'0'); const bal=parseFloat(balText)||0;
+      let show=true; if(type==='ada'&&bal<=0) show=false; if(type==='kosong'&&bal!==0) show=false;
+      row.style.display=show?'':'none'; if(show) visible++;
     });
+    filterCount.textContent='Menampilkan '+visible+' wallet';
   }
-
   el('filterAll').onclick=()=>{setActive(el('filterAll'));applyFilter('all');};
   el('filterAda').onclick=()=>{setActive(el('filterAda'));applyFilter('ada');};
   el('filterKosong').onclick=()=>{setActive(el('filterKosong'));applyFilter('kosong');};
