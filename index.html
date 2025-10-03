@@ -23,9 +23,12 @@
     .ok{color:#34d399}.err{color:#fb7185}
     .stats{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
     .total-balance{font-size:18px;font-weight:bold;text-align:right;margin-top:12px}
-  .form{display:flex;flex-direction:column;gap:10px}
+    .form{display:flex;flex-direction:column;gap:10px}
     .form-group label{font-size:12px;color:#94a3b8;margin-bottom:4px;display:block}
     .row{display:flex;gap:8px;align-items:center}
+    .filters{margin:8px 0;display:flex;gap:8px}
+    .filters button{background:#1f2937;color:#e5e7eb}
+    .filters button.active{background:#10b981;color:#001b10;font-weight:700}
   </style>
 </head>
 <body>
@@ -80,9 +83,21 @@
         <span class="pill err">ERR: <span id="statErr">0</span></span>
         <span class="pill">Duration: <span id="statDur">0s</span></span>
       </div>
+      
+      <!-- tombol filter -->
+      <div class="filters">
+        <button id="filterAll" class="active">Semua</button>
+        <button id="filterAda">Ada Saldo</button>
+        <button id="filterKosong">Kosong</button>
+      </div>
+
       <div style="overflow-y:auto;max-height:60vh">
         <table id="resultTable">
-          <thead><tr><th>#</th><th>Address</th><th>Balance</th><th>Nonce</th><th>Status</th><th>Message</th></tr></thead>
+          <thead>
+            <tr>
+              <th>#</th><th>Address</th><th>Balance</th><th>Nonce</th><th>Status</th><th>Message</th>
+            </tr>
+          </thead>
           <tbody></tbody>
         </table>
       </div>
@@ -103,7 +118,13 @@
 
   function addRow(i,addr){
     const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${i+1}</td><td class="address">${addr}</td><td data-k="bal">-</td><td data-k="nonce">-</td><td data-k="status">…</td><td data-k="msg"></td>`;
+    tr.innerHTML=`
+      <td>${i+1}</td>
+      <td class="address">${addr}</td>
+      <td data-k="bal">-</td>
+      <td data-k="nonce">-</td>
+      <td data-k="status">…</td>
+      <td data-k="msg"></td>`;
     tbody.appendChild(tr);return tr;
   }
 
@@ -114,11 +135,14 @@
       const balWei=await provider.getBalance(addr);
       const nonce=await provider.getTransactionCount(addr);
       const ether=ethers.utils.formatEther(balWei);
+      const etherNum=parseFloat(ether);
+
       row.querySelector('[data-k=bal]').textContent=ether+" "+symbol;
       row.querySelector('[data-k=nonce]').textContent=nonce;
       row.querySelector('[data-k=status]').innerHTML='<span class="ok">OK</span>';
-      out.balance=ether;out.nonce=nonce;
-      sum+=parseFloat(ether);statSum.textContent=sum.toFixed(6);
+
+      out.balance=etherNum;out.nonce=nonce;
+      sum+=etherNum;statSum.textContent=sum.toFixed(6);
       return out;
     }catch(e){
       row.querySelector('[data-k=status]').innerHTML='<span class="err">ERR</span>';
@@ -147,8 +171,69 @@
   }
 
   el('btnCheck').onclick=run;el('btnStop').onclick=()=>controller.stop=true;
-  function exportSheet(type){if(!results.length) return alert('Belum ada hasil');const symbol=(el('customSymbol').value||'ETH').toUpperCase();const rows=[["#","Address","Balance ("+symbol+")","Nonce","Status","Message"]];results.forEach(r=>rows.push([r.index,r.address,r.balance? r.balance+" "+symbol:"",r.nonce,r.status,r.message]));const ws=XLSX.utils.aoa_to_sheet(rows);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Wallets');const fname='wallet-check-'+Date.now()+(type==='csv'?'.csv':'.xlsx');XLSX.writeFile(wb,fname,{bookType:type==='csv'?'csv':'xlsx'});}
-  el('btnExportCsv').onclick=()=>exportSheet('csv');el('btnExportXlsx').onclick=()=>exportSheet('xlsx');
+
+  // Import CSV/XLSX
+  const fileInput = document.getElementById('fileInput');
+  const btnImport = document.getElementById('btnImport');
+  const addrInput = document.getElementById('addrInput');
+  const addrCount = document.getElementById('addrCount');
+
+  btnImport.onclick = async () => {
+    const f = fileInput.files?.[0];
+    if(!f) return alert('Pilih file dulu');
+    const buf = await f.arrayBuffer();
+    const wb = XLSX.read(buf, {type:'array'});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, {header:1});
+    const addrs = rows.flat().map(x=>String(x||'').trim()).filter(Boolean);
+    addrInput.value = addrs.join('\n');
+    addrCount.textContent = addrs.length+' addr';
+  };
+
+  // Export CSV/XLSX
+  function exportSheet(type){
+    if(!results.length) return alert('Belum ada hasil');
+    const symbol=(el('customSymbol').value||'ETH').toUpperCase();
+    const rows=[["#","Address","Balance ("+symbol+")","Nonce","Status","Message"]];
+    results.forEach(r=>{
+      rows.push([
+        r.index,
+        r.address,
+        r.balance != null ? r.balance+" "+symbol : "",
+        r.nonce ?? "",
+        r.status,
+        r.message || ""
+      ]);
+    });
+    const ws=XLSX.utils.aoa_to_sheet(rows);
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'Wallets');
+    const fname='wallet-check-'+Date.now()+(type==='csv'?'.csv':'.xlsx');
+    XLSX.writeFile(wb,fname,{bookType:type==='csv'?'csv':'xlsx'});
+  }
+  el('btnExportCsv').onclick=()=>exportSheet('csv');
+  el('btnExportXlsx').onclick=()=>exportSheet('xlsx');
+
+  // === FILTER FITUR ===
+  function setActive(btn){
+    document.querySelectorAll('.filters button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  function applyFilter(type){
+    const rows = tbody.querySelectorAll('tr');
+    rows.forEach((row, i)=>{
+      const balCell = row.querySelector('[data-k=bal]');
+      const balText = balCell.textContent.split(" ")[0];
+      const bal = parseFloat(balText)||0;
+      if(type==='all'){ row.style.display=''; }
+      if(type==='ada'){ row.style.display = bal>0 ? '' : 'none'; }
+      if(type==='kosong'){ row.style.display = bal===0 ? '' : 'none'; }
+    });
+  }
+
+  el('filterAll').onclick=()=>{setActive(el('filterAll'));applyFilter('all');};
+  el('filterAda').onclick=()=>{setActive(el('filterAda'));applyFilter('ada');};
+  el('filterKosong').onclick=()=>{setActive(el('filterKosong'));applyFilter('kosong');};
 })();
 </script>
 </body>
