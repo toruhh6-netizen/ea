@@ -168,26 +168,30 @@
   const el=id=>document.getElementById(id);
   const tbody=document.querySelector('#resultTable tbody');
   const statTotal=el('statTotal'), statOk=el('statOk'), statErr=el('statErr'), statDur=el('statDur'), statSum=el('statSum');
-  const filterCount=el('filterCount');const chainSummaryEl=el('chainSummary');
+  const filterCount=el('filterCount'); const chainSummaryEl=el('chainSummary');
 
   let controller={stop:false}, results=[], selectedChains=[];
 
+  // ----- Chips -----
   function renderChosenChains(){
-    const wrap=el('chosenChains');wrap.innerHTML='';
-    if(!selectedChains.length){ wrap.innerHTML='<span style="font-size:12px;color:#94a3b8">Belum ada chain terpilih</span>'; return; }
+    const wrap=el('chosenChains'); wrap.innerHTML='';
+    if(!selectedChains.length){
+      wrap.innerHTML='<span style="font-size:12px;color:#94a3b8">Belum ada chain terpilih</span>';
+      return;
+    }
     selectedChains.forEach((c,idx)=>{
       const chip=document.createElement('div');
       chip.className=`chip ${c.symbol||'custom'}`;
       chip.innerHTML=`<strong>${c.name}</strong> (${c.symbol})`;
       const btn=document.createElement('button');
-      btn.className='x';btn.textContent='×';
+      btn.className='x'; btn.textContent='×';
       btn.onclick=()=>{ selectedChains.splice(idx,1); renderChosenChains(); };
-      chip.appendChild(btn);wrap.appendChild(chip);
+      chip.appendChild(btn);
+      wrap.appendChild(chip);
     });
   }
-
   el('btnAddPreset').onclick=()=>{
-    const v=el('rpcPreset').value;if(!v) return;
+    const v=el('rpcPreset').value; if(!v) return;
     const [name,url,symbol]=v.split('|');
     if(selectedChains.some(c=>c.url===url)) return alert('Sudah ada');
     selectedChains.push({name,url,symbol}); renderChosenChains();
@@ -196,106 +200,148 @@
   el('btnAddCustom').onclick=()=>{
     const url=el('rpcUrl').value.trim();
     const symbol=(el('customSymbol').value||'').trim().toUpperCase();
-    if(!url || !symbol) return alert('Isi Custom RPC dan Symbol dulu');
+    if(!url||!symbol) return alert('Isi Custom RPC dan Symbol dulu');
     if(selectedChains.some(c=>c.url===url)) return alert('RPC sudah ada di daftar');
     selectedChains.push({name:'Custom',url,symbol}); renderChosenChains();
   };
   renderChosenChains();
 
+  // ----- Table helpers -----
   function addRow(i,chain,addr,sym){
     const tr=document.createElement('tr');
     tr.innerHTML=`<td>${i+1}</td><td>${chain}</td><td class="address">${addr}</td><td data-k="bal">-</td><td data-k="nonce">-</td><td data-k="status">…</td><td data-k="msg"></td>`;
-    tbody.appendChild(tr);return tr;
+    tbody.appendChild(tr); return tr;
   }
-
   async function checkOne(provider,addr,i,row,symbol,chain){
     const out={index:i+1,chain,symbol,address:addr,balance:null,nonce:null,status:"OK",message:""};
     try{
       if(!ethers.utils.isAddress(addr)) throw new Error("Invalid address");
       const balWei=await provider.getBalance(addr);
       const nonce=await provider.getTransactionCount(addr);
-      const ether=ethers.utils.formatEther(balWei);const etherNum=parseFloat(ether);
+      const ether=ethers.utils.formatEther(balWei);
+      const etherNum=parseFloat(ether);
       row.querySelector('[data-k=bal]').textContent=ether+" "+symbol;
       row.querySelector('[data-k=nonce]').textContent=nonce;
       row.querySelector('[data-k=status]').innerHTML='<span class="ok">OK</span>';
-      out.balance=etherNum;out.nonce=nonce;return out;
+      out.balance=etherNum; out.nonce=nonce; return out;
     }catch(e){
       row.querySelector('[data-k=status]').innerHTML='<span class="err">ERR</span>';
       row.querySelector('[data-k=msg]').textContent=e.message;
-      out.status="ERR";out.message=e.message;return out;
+      out.status="ERR"; out.message=e.message; return out;
     }
   }
 
+  // ----- Summary -----
   function updateSummary(){
-    const summary={};let total=0;
-    results.forEach(r=>{ if(r && r.status==="OK"){ summary[r.symbol]=(summary[r.symbol]||0)+(r.balance||0); total+=r.balance||0; }});
+    const summary={}; let total=0;
+    results.forEach(r=>{
+      if(r && r.status==='OK'){
+        summary[r.symbol]=(summary[r.symbol]||0)+(r.balance||0);
+        total += (r.balance||0);
+      }
+    });
     if(!Object.keys(summary).length){ chainSummaryEl.textContent='-'; statSum.textContent='0'; return; }
-    chainSummaryEl.innerHTML=Object.entries(summary).map(([sym,t])=>`${sym}: ${t.toFixed(6)}`).join('<br>');
+    chainSummaryEl.innerHTML = Object.entries(summary).map(([sym,t])=>`${sym}: ${t.toFixed(6)}`).join('<br>');
     statSum.textContent = total.toFixed(6);
   }
 
-  // === FIXED RUN ===
-  function uniqueChains(list){ const m=new Map(); list.forEach(c=>{ if(!m.has(c.url)) m.set(c.url,c); }); return Array.from(m.values()); }
+  // ----- Run (FIXED duplicate custom) -----
+  function uniqueChains(list){
+    const m=new Map();
+    list.forEach(c=>{ if(!m.has(c.url)) m.set(c.url,c); });
+    return Array.from(m.values());
+  }
   async function run(){
-    controller.stop=false;results=[];tbody.innerHTML='';
+    controller.stop=false; results=[]; tbody.innerHTML='';
     const addrs=(el('addrInput').value||'').split(/\r?\n|,|\s+/).map(s=>s.trim()).filter(Boolean);
     if(!addrs.length) return alert('Isi alamat dulu');
 
+    // start from selected chips
     let chains = uniqueChains([...selectedChains]);
-    const customUrl=el('rpcUrl').value.trim(); const customSym=(el('customSymbol').value||'').trim().toUpperCase();
+
+    // add custom only if not already present
+    const customUrl = el('rpcUrl').value.trim();
+    const customSym = (el('customSymbol').value||'').trim().toUpperCase();
     if(customUrl && customSym && !chains.some(c=>c.url===customUrl)){
-      chains.push({name:'Custom',url:customUrl,symbol:customSym});
+      chains.push({name:'Custom', url:customUrl, symbol:customSym});
     }
     chains = uniqueChains(chains);
     if(!chains.length) return alert('Pilih minimal 1 chain');
 
-    statTotal.textContent=addrs.length*chains.length;
-    let ok=0,err=0,start=Date.now();let cursor=0;
-    const pool=Number(el('concurrency').value||6); const timeout=Number(el('timeout').value||15000);
+    statTotal.textContent = addrs.length * chains.length;
+    let ok=0,err=0,start=Date.now(); let cursor=0;
+    const pool = Number(el('concurrency').value||6);
+    const timeout = Number(el('timeout').value||15000);
 
-    const jobs=[]; chains.forEach(c=> addrs.forEach(addr=> jobs.push({url:c.url,sym:c.symbol,addr,chain:c.name})));
-    const rows=jobs.map((job,i)=>addRow(i,job.chain,job.addr,job.sym));
+    const jobs=[];
+    chains.forEach(c=> addrs.forEach(addr => jobs.push({url:c.url, sym:c.symbol, addr, chain:c.name})));
+
+    const rows = jobs.map((job,i)=>addRow(i,job.chain,job.addr,job.sym));
 
     async function worker(){
       while(!controller.stop && cursor<jobs.length){
-        const j=cursor++; const job=jobs[j]; const row=rows[j];
-        const provider=new ethers.providers.JsonRpcProvider({url:job.url,timeout});
-        const res=await checkOne(provider,job.addr,j,row,job.sym,job.chain);
+        const j=cursor++;
+        const job=jobs[j], row=rows[j];
+        const provider=new ethers.providers.JsonRpcProvider({url:job.url, timeout});
+        const res=await checkOne(provider, job.addr, j, row, job.sym, job.chain);
         results[j]=res; (res.status==='OK'?ok++:err++);
         statOk.textContent=ok; statErr.textContent=err; statDur.textContent=((Date.now()-start)/1000).toFixed(1)+'s';
         updateSummary();
       }
     }
-    await Promise.all(Array.from({length:Math.min(pool,jobs.length)},worker));
+    await Promise.all(Array.from({length:Math.min(pool,jobs.length)}, worker));
   }
-  el('btnCheck').onclick=run; el('btnStop').onclick=()=>controller.stop=true;
+  el('btnCheck').onclick=run;
+  el('btnStop').onclick=()=>controller.stop=true;
 
-  // import
+  // ----- Import -----
   el('btnImport').onclick=async()=>{
     const f=el('fileInput').files?.[0]; if(!f) return alert('Pilih file dulu');
     const buf=await f.arrayBuffer(); const wb=XLSX.read(buf,{type:'array'});
     const ws=wb.Sheets[wb.SheetNames[0]]; const rows=XLSX.utils.sheet_to_json(ws,{header:1});
     const addrs=rows.flat().map(x=>String(x||'').trim()).filter(Boolean);
-    el('addrInput').value=addrs.join('\n'); el('addrCount').textContent=addrs.length+' addr';
+    el('addrInput').value = addrs.join('\n');
+    el('addrCount').textContent = addrs.length+' addr';
   };
 
-  // export
+  // ----- Export -----
   function exportSheet(type){
     if(!results.length) return alert('Belum ada hasil');
     const rows=[["#","Chain","Address","Balance","Nonce","Status","Message"]];
-    results.forEach(r=>rows.push([r.index,r.chain,r.address,r.balance!=null?r.balance+" "+r.symbol:"",r.nonce??"",r.status,r.message||""]));
-    const ws=XLSX.utils.aoa_to_sheet(rows); const wb=XLSX.utils.book_new();
+    results.forEach(r=>{
+      rows.push([r.index,r.chain,r.address,r.balance!=null?`${r.balance} ${r.symbol}`:"",r.nonce??"",r.status,r.message||""]);
+    });
+    const ws=XLSX.utils.aoa_to_sheet(rows);
+    const wb=XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb,ws,'Wallets');
-    XLSX.writeFile(wb,'wallet-check-'+Date.now()+(type==='csv'?'.csv':'.xlsx'),{bookType:type==='csv'?'csv':'xlsx'});
+    const fname='wallet-check-'+Date.now()+(type==='csv'?'.csv':'.xlsx');
+    XLSX.writeFile(wb,fname,{bookType:type==='csv'?'csv':'xlsx'});
   }
-  el('btnExportCsv').onclick=()=>exportSheet('csv'); el('btnExportXlsx').onclick=()=>exportSheet('xlsx');
+  el('btnExportCsv').onclick=()=>exportSheet('csv');
+  el('btnExportXlsx').onclick=()=>exportSheet('xlsx');
 
-  // filter
-  function setActive(btn){document.querySelectorAll('.filters button').forEach(b=>b.classList.remove('active')); btn.classList.add('active');}
+  // ----- Filter -----
+  function setActive(btn){
+    document.querySelectorAll('.filters button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+  }
   function applyFilter(type){
     const rows=tbody.querySelectorAll('tr'); let visible=0;
     rows.forEach(row=>{
-      const balText=(row.querySelector('[data-k=bal]').textContent.split(' ')[0]||'0'); const bal=parseFloat(balText)||0;
-      let show=true; if(type==='ada'&&bal<=0) show=false; if(type==='kosong'&&bal!==0) show=false;
-      row.style.display=show?'':'none'; if(show) visible++;
-   
+      const balText=(row.querySelector('[data-k=bal]').textContent.split(' ')[0]||'0');
+      const bal=parseFloat(balText)||0;
+      let show=true;
+      if(type==='ada'&&bal<=0) show=false;
+      if(type==='kosong'&&bal!==0) show=false;
+      row.style.display=show?'':'none';
+      if(show) visible++;
+    });
+    filterCount.textContent='Menampilkan '+visible+' wallet';
+  }
+  el('filterAll').onclick=()=>{ setActive(el('filterAll')); applyFilter('all'); };
+  el('filterAda').onclick=()=>{ setActive(el('filterAda')); applyFilter('ada'); };
+  el('filterKosong').onclick=()=>{ setActive(el('filterKosong')); applyFilter('kosong'); };
+})();
+</script>
+</body>
+</html>
