@@ -16,7 +16,6 @@
     textarea{height:160px;resize:vertical}
     button{margin-top:8px;padding:10px 12px;border:0;border-radius:10px;cursor:pointer}
     button.primary{background:#10b981;color:#001b10;font-weight:700}
-    button.ghost{background:#1f2937;color:#e5e7eb}
     button.danger{background:#dc2626;color:#fff}
     button.success{background:#22c55e;color:#fff;font-weight:600}
     table{width:100%;border-collapse:collapse;table-layout:auto}
@@ -39,7 +38,6 @@
     .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;font-size:12px;color:#fff}
     .chip .x{background:rgba(0,0,0,0.3);border:0;padding:2px 6px;border-radius:999px;cursor:pointer;color:#fff}
     .divider{height:1px;background:#1f2a44;margin:8px 0}
-    /* warna per chain */
     .chip.ETH{background:#2563eb}
     .chip.BNB{background:#f59e0b}
     .chip.MATIC{background:#7c3aed}
@@ -76,7 +74,6 @@
           </div>
         </div>
 
-        <!-- preset -->
         <div class="form-group">
           <label>Pilih RPC Default</label>
           <div class="row" style="width:100%">
@@ -95,7 +92,6 @@
           <div class="divider"></div>
         </div>
 
-        <!-- custom rpc -->
         <div class="form-group">
           <label>Custom RPC URL</label>
           <input id="rpcUrl" placeholder="https://rpc.ankr.com/eth"/>
@@ -174,33 +170,8 @@
   const statTotal=el('statTotal'), statOk=el('statOk'), statErr=el('statErr'), statDur=el('statDur'), statSum=el('statSum');
   const filterCount=el('filterCount');const chainSummaryEl=el('chainSummary');
 
-  // === LocalStorage keys ===
-  const LS_CHAINS = 'mc_selected_chains';
-  const LS_CONC   = 'mc_concurrency';
-  const LS_TO     = 'mc_timeout';
-  const LS_RPC    = 'mc_custom_rpc';
-  const LS_SYM    = 'mc_custom_symbol';
-
-  // state
   let controller={stop:false}, results=[], selectedChains=[];
 
-  // load persisted
-  try{
-    const sc = JSON.parse(localStorage.getItem(LS_CHAINS)||'[]');
-    if(Array.isArray(sc)) selectedChains = sc;
-  }catch{}
-  el('concurrency').value = localStorage.getItem(LS_CONC) || 6;
-  el('timeout').value     = localStorage.getItem(LS_TO) || 15000;
-  el('rpcUrl').value      = localStorage.getItem(LS_RPC) || '';
-  el('customSymbol').value= localStorage.getItem(LS_SYM) || '';
-
-  // persist on change
-  el('concurrency').addEventListener('change', ()=>localStorage.setItem(LS_CONC, el('concurrency').value));
-  el('timeout').addEventListener('change', ()=>localStorage.setItem(LS_TO, el('timeout').value));
-  el('rpcUrl').addEventListener('change', ()=>localStorage.setItem(LS_RPC, el('rpcUrl').value.trim()));
-  el('customSymbol').addEventListener('change', ()=>localStorage.setItem(LS_SYM, el('customSymbol').value.trim().toUpperCase()));
-
-  // chips
   function renderChosenChains(){
     const wrap=el('chosenChains');wrap.innerHTML='';
     if(!selectedChains.length){ wrap.innerHTML='<span style="font-size:12px;color:#94a3b8">Belum ada chain terpilih</span>'; return; }
@@ -210,37 +181,27 @@
       chip.innerHTML=`<strong>${c.name}</strong> (${c.symbol})`;
       const btn=document.createElement('button');
       btn.className='x';btn.textContent='×';
-      btn.onclick=()=>{ selectedChains.splice(idx,1); saveChains(); renderChosenChains(); };
+      btn.onclick=()=>{ selectedChains.splice(idx,1); renderChosenChains(); };
       chip.appendChild(btn);wrap.appendChild(chip);
     });
   }
-  function saveChains(){ localStorage.setItem(LS_CHAINS, JSON.stringify(selectedChains)); }
 
-  // preset add/clear
   el('btnAddPreset').onclick=()=>{
     const v=el('rpcPreset').value;if(!v) return;
     const [name,url,symbol]=v.split('|');
     if(selectedChains.some(c=>c.url===url)) return alert('Sudah ada');
-    selectedChains.push({name,url,symbol}); saveChains(); renderChosenChains();
+    selectedChains.push({name,url,symbol}); renderChosenChains();
   };
-  el('btnClearAll').onclick=()=>{
-    if(confirm('Yakin hapus semua chain terpilih?')){
-      selectedChains=[]; saveChains(); renderChosenChains();
-    }
-  };
-
-  // add custom
+  el('btnClearAll').onclick=()=>{ selectedChains=[]; renderChosenChains(); };
   el('btnAddCustom').onclick=()=>{
     const url=el('rpcUrl').value.trim();
     const symbol=(el('customSymbol').value||'').trim().toUpperCase();
     if(!url || !symbol) return alert('Isi Custom RPC dan Symbol dulu');
     if(selectedChains.some(c=>c.url===url)) return alert('RPC sudah ada di daftar');
-    selectedChains.push({name:'Custom',url,symbol}); saveChains(); renderChosenChains();
+    selectedChains.push({name:'Custom',url,symbol}); renderChosenChains();
   };
-
   renderChosenChains();
 
-  // helper
   function addRow(i,chain,addr,sym){
     const tr=document.createElement('tr');
     tr.innerHTML=`<td>${i+1}</td><td>${chain}</td><td class="address">${addr}</td><td data-k="bal">-</td><td data-k="nonce">-</td><td data-k="status">…</td><td data-k="msg"></td>`;
@@ -265,41 +226,34 @@
     }
   }
 
-  function updateFilterCount(){
-    const activeBtn=document.querySelector('.filters button.active');
-    if(activeBtn.id==='filterAll') applyFilter('all');
-    if(activeBtn.id==='filterAda') applyFilter('ada');
-    if(activeBtn.id==='filterKosong') applyFilter('kosong');
-  }
-
   function updateSummary(){
     const summary={};let total=0;
-    results.forEach(r=>{
-      if(r && r.status==="OK"){
-        summary[r.symbol]=(summary[r.symbol]||0)+(r.balance||0);
-        total += (r.balance||0);
-      }
-    });
+    results.forEach(r=>{ if(r && r.status==="OK"){ summary[r.symbol]=(summary[r.symbol]||0)+(r.balance||0); total+=r.balance||0; }});
     if(!Object.keys(summary).length){ chainSummaryEl.textContent='-'; statSum.textContent='0'; return; }
     chainSummaryEl.innerHTML=Object.entries(summary).map(([sym,t])=>`${sym}: ${t.toFixed(6)}`).join('<br>');
     statSum.textContent = total.toFixed(6);
   }
 
-  // run
+  // === FIXED RUN ===
+  function uniqueChains(list){ const m=new Map(); list.forEach(c=>{ if(!m.has(c.url)) m.set(c.url,c); }); return Array.from(m.values()); }
   async function run(){
     controller.stop=false;results=[];tbody.innerHTML='';
     const addrs=(el('addrInput').value||'').split(/\r?\n|,|\s+/).map(s=>s.trim()).filter(Boolean);
     if(!addrs.length) return alert('Isi alamat dulu');
-    let chains=[...selectedChains];
+
+    let chains = uniqueChains([...selectedChains]);
     const customUrl=el('rpcUrl').value.trim(); const customSym=(el('customSymbol').value||'').trim().toUpperCase();
-    if(customUrl && customSym) chains.push({name:'Custom',url:customUrl,symbol:customSym});
+    if(customUrl && customSym && !chains.some(c=>c.url===customUrl)){
+      chains.push({name:'Custom',url:customUrl,symbol:customSym});
+    }
+    chains = uniqueChains(chains);
     if(!chains.length) return alert('Pilih minimal 1 chain');
 
     statTotal.textContent=addrs.length*chains.length;
     let ok=0,err=0,start=Date.now();let cursor=0;
     const pool=Number(el('concurrency').value||6); const timeout=Number(el('timeout').value||15000);
 
-    const jobs=[]; chains.forEach(c=>addrs.forEach(addr=>jobs.push({url:c.url,sym:c.symbol,addr,chain:c.name})));
+    const jobs=[]; chains.forEach(c=> addrs.forEach(addr=> jobs.push({url:c.url,sym:c.symbol,addr,chain:c.name})));
     const rows=jobs.map((job,i)=>addRow(i,job.chain,job.addr,job.sym));
 
     async function worker(){
@@ -309,12 +263,11 @@
         const res=await checkOne(provider,job.addr,j,row,job.sym,job.chain);
         results[j]=res; (res.status==='OK'?ok++:err++);
         statOk.textContent=ok; statErr.textContent=err; statDur.textContent=((Date.now()-start)/1000).toFixed(1)+'s';
-        updateFilterCount(); updateSummary();
+        updateSummary();
       }
     }
     await Promise.all(Array.from({length:Math.min(pool,jobs.length)},worker));
   }
-
   el('btnCheck').onclick=run; el('btnStop').onclick=()=>controller.stop=true;
 
   // import
@@ -345,13 +298,4 @@
       const balText=(row.querySelector('[data-k=bal]').textContent.split(' ')[0]||'0'); const bal=parseFloat(balText)||0;
       let show=true; if(type==='ada'&&bal<=0) show=false; if(type==='kosong'&&bal!==0) show=false;
       row.style.display=show?'':'none'; if(show) visible++;
-    });
-    filterCount.textContent='Menampilkan '+visible+' wallet';
-  }
-  el('filterAll').onclick=()=>{setActive(el('filterAll'));applyFilter('all');};
-  el('filterAda').onclick=()=>{setActive(el('filterAda'));applyFilter('ada');};
-  el('filterKosong').onclick=()=>{setActive(el('filterKosong'));applyFilter('kosong');};
-})();
-</script>
-</body>
-</html>
+   
